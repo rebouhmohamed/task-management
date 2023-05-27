@@ -9,12 +9,15 @@ import { User } from './user.entity';
 import { Repository } from 'typeorm';
 import { AuthCredentialsDto } from './dto/authCredentialsDto';
 import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
+import { JwtPayload } from './jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private jwtService: JwtService,
   ) {}
   async signUp(authCredentialsDto: AuthCredentialsDto): Promise<void> {
     const { username, password } = authCredentialsDto;
@@ -34,10 +37,15 @@ export class AuthService {
       }
     }
   }
-  async signIn(authCredentialsDto: AuthCredentialsDto) {
-    const result = await this.validateUserPassword(authCredentialsDto);
+  async signIn(
+    authCredentialsDto: AuthCredentialsDto,
+  ): Promise<{ accessToken: string }> {
+    const username = await this.validateUserPassword(authCredentialsDto);
 
-    console.log(result);
+    const payload: JwtPayload = { username };
+    const accessToken = await this.jwtService.sign(payload);
+
+    return { accessToken };
   }
   async validateUserPassword(
     authCredentialsDto: AuthCredentialsDto,
