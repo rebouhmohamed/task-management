@@ -6,7 +6,7 @@ import { Task } from './task.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Task])],
-  exports:[TypeOrmModule],
+  exports: [TypeOrmModule],
   controllers: [TasksController],
   providers: [TasksService],
 })
