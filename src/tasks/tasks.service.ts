@@ -5,6 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Task } from './task.entity';
 import { TaskStatus } from './task-status.enum';
 import { Repository } from 'typeorm';
+import { User } from 'src/auth/user.entity';
+import { Deleted } from './exceptions';
 
 @Injectable()
 export class TasksService {
@@ -13,9 +15,10 @@ export class TasksService {
     private readonly taskRepository: Repository<Task>,
   ) {}
 
-  async getTasks(filterDto: GetTasksFilterDto): Promise<Task[]> {
+  async getTasks(filterDto: GetTasksFilterDto, user: User): Promise<Task[]> {
     const { status, search } = filterDto;
     const query = await this.taskRepository.createQueryBuilder('task');
+    query.where('task.userId=:userId', { userId: user.id });
     if (status) {
       query.andWhere('task.status = :status', { status });
     }
@@ -29,10 +32,11 @@ export class TasksService {
     return tasks;
   }
 
-  async getTaskById(id: number): Promise<Task> {
+  async getTaskById(id: number, user: User): Promise<Task> {
     const found = await this.taskRepository.findOne({
       where: {
         id: id,
+        userId: user.id,
       },
     });
 
@@ -41,28 +45,36 @@ export class TasksService {
     }
     return found;
   }
-  async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
+  async createTask(createTaskDto: CreateTaskDto, user: User): Promise<Task> {
     const { title, description } = createTaskDto;
 
     const task = new Task();
     task.title = title;
     task.description = description;
     task.status = TaskStatus.OPEN;
+    task.user = user;
 
     await task.save();
+    delete task.user;
     return task;
   }
 
-  async deleteTask(id: number): Promise<void> {
-    const found = await this.taskRepository.delete(id);
+  async deleteTask(id: number, user: User): Promise<string> {
+    const result = await this.taskRepository.delete({ id, userId: user.id });
 
-    if (!found) {
+    if (result.affected === 0) {
       throw new NotFoundException(`Task with Id "${id}" not found`);
+    } else {
+      throw new Deleted();
     }
   }
 
-  async upadteTaskStatus(id: number, status: TaskStatus): Promise<Task> {
-    const task = await this.getTaskById(id);
+  async upadteTaskStatus(
+    id: number,
+    status: TaskStatus,
+    user: User,
+  ): Promise<Task> {
+    const task = await this.getTaskById(id, user);
     task.status = status;
     await task.save();
     return task;
